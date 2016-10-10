@@ -1,9 +1,7 @@
 /*
-  DS3231: Real-Time Clock. Alarm simple
-  Read more: www.jarzebski.pl/arduino/komponenty/zegar-czasu-rzeczywistego-rtc-DS3231.html
-  GIT: https://github.com/jarzebski/Arduino-DS3231
-  Web: http://www.jarzebski.pl
-  (c) 2014 by Korneliusz Jarzebski
+  DS3231: Real-Time Clock (with alarm)
+  Based on: www.jarzebski.pl/arduino/komponenty/zegar-czasu-rzeczywistego-rtc-DS3231.html
+  (c) 2016 by Alfred Broda
 */
 
 #include <Wire.h>
@@ -18,6 +16,8 @@ RTCDateTime dt;
 #define DIO 4
 TM1637Display clockDisplay(CLK, DIO);
 bool clockDot = false;
+
+#define LAMP 6
 
 void setup()
 {
@@ -34,95 +34,15 @@ void setup()
   clock.clearAlarm1();
   clock.clearAlarm2();
  
-  // Set Alarm - Every 01h:10m:30s in each day
+  // Set Alarm - Every 05h:30m:00s in each day
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-  clock.setAlarm1(0, 23, 57, 00, DS3231_MATCH_H_M_S);
-
-  // Check alarm settings
-  checkAlarms();
+  clock.setAlarm1(0, 5, 30, 00, DS3231_MATCH_H_M_S);
 
   // Initialize display
-  clockDisplay.setBrightness(0x0f);
-}
-
-void checkAlarms()
-{
-  RTCAlarmTime a1;  
-  RTCAlarmTime a2;
-
-  if (clock.isArmed1())
-  {
-    a1 = clock.getAlarm1();
-
-    Serial.print("Alarm1 is triggered ");
-    switch (clock.getAlarmType1())
-    {
-      case DS3231_EVERY_SECOND:
-        Serial.println("every second");
-        break;
-      case DS3231_MATCH_S:
-        Serial.print("when seconds match: ");
-        Serial.println(clock.dateFormat("__ __:__:s", a1));
-        break;
-      case DS3231_MATCH_M_S:
-        Serial.print("when minutes and sencods match: ");
-        Serial.println(clock.dateFormat("__ __:i:s", a1));
-        break;
-      case DS3231_MATCH_H_M_S:
-        Serial.print("when hours, minutes and seconds match: ");
-        Serial.println(clock.dateFormat("__ H:i:s", a1));
-        break;
-      case DS3231_MATCH_DT_H_M_S:
-        Serial.print("when date, hours, minutes and seconds match: ");
-        Serial.println(clock.dateFormat("d H:i:s", a1));
-        break;
-      case DS3231_MATCH_DY_H_M_S:
-        Serial.print("when day of week, hours, minutes and seconds match: ");
-        Serial.println(clock.dateFormat("l H:i:s", a1));
-        break;
-      default: 
-        Serial.println("UNKNOWN RULE");
-        break;
-    }
-  } else
-  {
-    Serial.println("Alarm1 is disarmed.");
-  }
-
-  if (clock.isArmed2())
-  {
-    a2 = clock.getAlarm2();
-
-    Serial.print("Alarm2 is triggered ");
-    switch (clock.getAlarmType2())
-    {
-      case DS3231_EVERY_MINUTE:
-        Serial.println("every minute");
-        break;
-      case DS3231_MATCH_M:
-        Serial.print("when minutes match: ");
-        Serial.println(clock.dateFormat("__ __:i:s", a2));
-        break;
-      case DS3231_MATCH_H_M:
-        Serial.print("when hours and minutes match:");
-        Serial.println(clock.dateFormat("__ H:i:s", a2));
-        break;
-      case DS3231_MATCH_DT_H_M:
-        Serial.print("when date, hours and minutes match: ");
-        Serial.println(clock.dateFormat("d H:i:s", a2));
-        break;
-      case DS3231_MATCH_DY_H_M:
-        Serial.println("when day of week, hours and minutes match: ");
-        Serial.print(clock.dateFormat("l H:i:s", a2));
-        break;
-      default: 
-        Serial.println("UNKNOWN RULE"); 
-        break;
-    }
-  } else
-  {
-    Serial.println("Alarm2 is disarmed.");
-  }
+  clockDisplay.setBrightness(0x08);
+  
+  pinMode(LAMP, OUTPUT);
+  digitalWrite(LAMP, LOW);
 }
 
 void loop()
@@ -135,6 +55,12 @@ void loop()
   if(clockDot) 
   {
 //    clockDisplay.point(1);
+    clock.forceConversion();
+
+    Serial.print("Temperature: ");
+    int temp = clock.readTemperature();
+    Serial.println(temp);
+    clockDisplay.showNumberDec(temp);
   } else {
 //    clockDisplay.point(0);
   }
@@ -144,12 +70,14 @@ void loop()
   if (clock.isAlarm1())
   {
     Serial.println("ALARM 1 TRIGGERED!");
+    digitalWrite(LAMP, HIGH);
   }
 
   // Call isAlarm2(false) if you want clear alarm1 flag manualy by clearAlarm2();
   if (clock.isAlarm2())
   {
     Serial.println("ALARM 2 TRIGGERED!");
+    digitalWrite(LAMP, HIGH);
   }
  
   delay(1000);
