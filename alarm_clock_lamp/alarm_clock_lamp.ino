@@ -19,17 +19,18 @@ RTCDateTime dt;
 // Display module connection pins (Digital Pins)
 #define DISP_CLK 5
 #define DISP_DIO 4
+#define DEFAULT_BRIGHTNESS 20
 SevenSegmentExtended display(DISP_CLK, DISP_DIO);
 
 // For switching displayed information
-#define TEMP_INTERVAL 5
+#define TEMP_INTERVAL 4 // seconds
 int tempCounter = 0;
 
 // Alarm digital pin for starting the alarm function
 #define ALARM_PIN 6
-#define ALARM_TIME 1800000
+#define ALARM_TIME 1800.0 //seconds
 bool alarmTriggered = false;
-int alarmLeft = ALARM_TIME;
+int alarmProgress = 0;
 
 void setup()
 {
@@ -47,15 +48,13 @@ void setup()
 
   // Set Alarm - Every 05h:30m:00s each day
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-//  clock.setAlarm1(0, 5, 30, 00, DS3231_MATCH_H_M_S);
-
-  clock.setAlarm1(0, 22, 16, 00, DS3231_MATCH_H_M_S);
-  clock.armAlarm1(true);
+  clock.setAlarm1(0, 5, 30, 00, DS3231_MATCH_H_M_S, true);
+//  clock.setAlarm2(0, 22, 52, DS3231_MATCH_DT_H_M, true);
 
   // Initialize display
   display.begin();
   display.on();
-  display.setBacklight(30);
+  display.setBacklight(DEFAULT_BRIGHTNESS);
   display.setPrintDelay(300);
 
   pinMode(ALARM_PIN, OUTPUT);
@@ -86,24 +85,17 @@ void loop()
     tempCounter++;
     display.printTime(dt.hour, dt.minute, true);
 
-    // Call isAlarm1(false) if you want clear alarm1 flag manualy by clearAlarm1();
-    if (clock.isAlarm1())
+    if (clock.isAlarm1() || clock.isAlarm2())
     {
       startAlarm();
-    }
-  
-    // Call isAlarm2(false) if you want clear alarm1 flag manualy by clearAlarm2();
-    if (clock.isAlarm2())
-    {
-      startAlarm();
-    }
+    }  
   }
-  if (alarmTriggered && alarmLeft > 0) {
-    runAlarm(alarmLeft);
-    alarmLeft--;
-  } else if (alarmLeft > 0) { // reset alarm counter
-    alarmTriggered = false;
-    alarmLeft = ALARM_TIME;
+
+  if (alarmTriggered && alarmProgress < ALARM_TIME) {
+    runAlarm(alarmProgress);
+    alarmProgress++;
+  } else if (alarmProgress >= ALARM_TIME) { // reset alarm counter
+    stopAlarm();
   }
 
   delay(1000);
@@ -112,11 +104,19 @@ void loop()
 void startAlarm() {
   alarmTriggered = true;
   display.blink();
-  digitalWrite(ALARM_PIN, LOW);
 }
 
-void runAlarm(int left) {
-  int progress = (left / ALARM_TIME) * 255;
+void stopAlarm() {
+//  digitalWrite(ALARM_PIN, LOW);
+  digitalWrite(ALARM_PIN, HIGH);
+  alarmTriggered = false;
+  alarmProgress = 0;
+  display.setBacklight(DEFAULT_BRIGHTNESS);
+}
 
-  analogWrite(ALARM_PIN, progress);
+void runAlarm(int done) {
+  float progress = done / ALARM_TIME;
+  int brightness = 1 + (progress * 254);
+
+  analogWrite(ALARM_PIN, brightness);
 }
