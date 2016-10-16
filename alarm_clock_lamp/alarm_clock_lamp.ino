@@ -19,11 +19,11 @@ RTCDateTime dt;
 // Display module connection pins (Digital Pins)
 #define DISP_CLK 5
 #define DISP_DIO 4
-
 SevenSegmentExtended display(DISP_CLK, DISP_DIO);
 
 // For switching displayed information
-bool displayTemp = false;
+#define TEMP_INTERVAL 5
+int tempCounter = 0;
 
 // Alarm digital pin for starting the alarm function
 #define ALARM 6
@@ -60,7 +60,7 @@ void loop()
 {
   dt = clock.getDateTime();
 
-  if (displayTemp) //display temperature
+  if (tempCounter > TEMP_INTERVAL) //display temperature
   {
     clock.forceConversion();
 
@@ -74,11 +74,14 @@ void loop()
 
     display.setColonOn(false);
     display.printRaw(seg_temp);
+    delay(3000);
+
+    tempCounter = 0;
   } else { //display clock
-    display.setColonOn(true);
+    tempCounter++;
     display.printTime(dt.hour, dt.minute, true);
 
-      // Call isAlarm1(false) if you want clear alarm1 flag manualy by clearAlarm1();
+    // Call isAlarm1(false) if you want clear alarm1 flag manualy by clearAlarm1();
     if (clock.isAlarm1())
     {
       digitalWrite(ALARM, HIGH);
@@ -96,7 +99,6 @@ void loop()
       digitalWrite(ALARM, LOW);
     }
   }
-  displayTemp = !displayTemp;
 
   delay(1000);
 }
