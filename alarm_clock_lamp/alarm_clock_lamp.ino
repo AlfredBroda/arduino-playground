@@ -33,7 +33,6 @@ void setup()
 //  Serial.begin(9600);
 
   // Initialize DS3231
-//  Serial.println("Initialize DS3231");;
   clock.begin();
 
   // Disarm alarms and clear alarms for this example, because alarms is battery backed.
@@ -48,9 +47,10 @@ void setup()
   clock.setAlarm1(0, 5, 30, 00, DS3231_MATCH_H_M_S);
 
   // Initialize display
-  display.off();
-  display.setBacklight(50);
+  display.begin();
   display.on();
+  display.setBacklight(50);
+  display.setPrintDelay(300);
 
   pinMode(ALARM, OUTPUT);
   digitalWrite(ALARM, LOW);
@@ -60,43 +60,43 @@ void loop()
 {
   dt = clock.getDateTime();
 
-  Serial.println(clock.dateFormat("d-m-Y H:i:s - l", dt));
-
-  if (displayTemp)
+  if (displayTemp) //display temperature
   {
     clock.forceConversion();
 
-    Serial.print("Temperature: ");
     int temp = clock.readTemperature();
-    Serial.print(temp);
-    Serial.println(" deg C");
-
     uint8_t seg_temp[] = {
       display.encode(temp / 10),
       display.encode(temp % 10),
-      TM1637_CHAR_STAR,        
+      B01100011, // degree sign
       TM1637_CHAR_C
     };
+
+    display.setColonOn(false);
     display.printRaw(seg_temp);
-  } else {
+  } else { //display clock
     display.setColonOn(true);
     display.printTime(dt.hour, dt.minute, true);
+
+      // Call isAlarm1(false) if you want clear alarm1 flag manualy by clearAlarm1();
+    if (clock.isAlarm1())
+    {
+      digitalWrite(ALARM, HIGH);
+      display.blink();
+      delay(3000);
+      digitalWrite(ALARM, LOW);
+    }
+  
+    // Call isAlarm2(false) if you want clear alarm1 flag manualy by clearAlarm2();
+    if (clock.isAlarm2())
+    {
+      digitalWrite(ALARM, HIGH);
+      display.blink();
+      delay(3000);
+      digitalWrite(ALARM, LOW);
+    }
   }
   displayTemp = !displayTemp;
-
-  // Call isAlarm1(false) if you want clear alarm1 flag manualy by clearAlarm1();
-  if (clock.isAlarm1())
-  {
-    Serial.println("ALARM 1 TRIGGERED!");
-    digitalWrite(ALARM, HIGH);
-  }
-
-  // Call isAlarm2(false) if you want clear alarm1 flag manualy by clearAlarm2();
-  if (clock.isAlarm2())
-  {
-    Serial.println("ALARM 2 TRIGGERED!");
-    digitalWrite(ALARM, HIGH);
-  }
 
   delay(1000);
 }
