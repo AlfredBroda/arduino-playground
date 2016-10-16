@@ -26,7 +26,10 @@ SevenSegmentExtended display(DISP_CLK, DISP_DIO);
 int tempCounter = 0;
 
 // Alarm digital pin for starting the alarm function
-#define ALARM 6
+#define ALARM_PIN 6
+#define ALARM_TIME 1800000
+bool alarmTriggered = false;
+int alarmLeft = ALARM_TIME;
 
 void setup()
 {
@@ -44,16 +47,19 @@ void setup()
 
   // Set Alarm - Every 05h:30m:00s each day
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-  clock.setAlarm1(0, 5, 30, 00, DS3231_MATCH_H_M_S);
+//  clock.setAlarm1(0, 5, 30, 00, DS3231_MATCH_H_M_S);
+
+  clock.setAlarm1(0, 22, 16, 00, DS3231_MATCH_H_M_S);
+  clock.armAlarm1(true);
 
   // Initialize display
   display.begin();
   display.on();
-  display.setBacklight(50);
+  display.setBacklight(30);
   display.setPrintDelay(300);
 
-  pinMode(ALARM, OUTPUT);
-  digitalWrite(ALARM, LOW);
+  pinMode(ALARM_PIN, OUTPUT);
+  digitalWrite(ALARM_PIN, LOW);
 }
 
 void loop()
@@ -74,7 +80,6 @@ void loop()
 
     display.setColonOn(false);
     display.printRaw(seg_temp);
-    delay(3000);
 
     tempCounter = 0;
   } else { //display clock
@@ -84,21 +89,34 @@ void loop()
     // Call isAlarm1(false) if you want clear alarm1 flag manualy by clearAlarm1();
     if (clock.isAlarm1())
     {
-      digitalWrite(ALARM, HIGH);
-      display.blink();
-      delay(3000);
-      digitalWrite(ALARM, LOW);
+      startAlarm();
     }
   
     // Call isAlarm2(false) if you want clear alarm1 flag manualy by clearAlarm2();
     if (clock.isAlarm2())
     {
-      digitalWrite(ALARM, HIGH);
-      display.blink();
-      delay(3000);
-      digitalWrite(ALARM, LOW);
+      startAlarm();
     }
+  }
+  if (alarmTriggered && alarmLeft > 0) {
+    runAlarm(alarmLeft);
+    alarmLeft--;
+  } else if (alarmLeft > 0) { // reset alarm counter
+    alarmTriggered = false;
+    alarmLeft = ALARM_TIME;
   }
 
   delay(1000);
+}
+
+void startAlarm() {
+  alarmTriggered = true;
+  display.blink();
+  digitalWrite(ALARM_PIN, LOW);
+}
+
+void runAlarm(int left) {
+  int progress = (left / ALARM_TIME) * 255;
+
+  analogWrite(ALARM_PIN, progress);
 }
