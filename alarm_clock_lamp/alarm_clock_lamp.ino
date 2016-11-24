@@ -29,6 +29,7 @@ int tempCounter = 0;
 // Alarm digital pin for starting the alarm function
 #define ALARM_PIN 6
 #define ALARM_TIME 1800.0 //seconds
+
 bool alarmTriggered = false;
 int alarmProgress = 0;
 
@@ -48,8 +49,8 @@ void setup()
 
   // Set Alarm - Every 05h:30m:00s each day
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-  clock.setAlarm1(0, 5, 30, 00, DS3231_MATCH_H_M_S, true);
-//  clock.setAlarm2(0, 22, 52, DS3231_MATCH_DT_H_M, true);
+  clock.setAlarm1(0, 5, 00, 00, DS3231_MATCH_H_M_S, true);
+  clock.setAlarm2(0, 7, 00, DS3231_MATCH_H_M, true);
 
   // Initialize display
   display.begin();
@@ -84,17 +85,22 @@ void loop()
   } else { //display clock
     tempCounter++;
     display.printTime(dt.hour, dt.minute, true);
+  }
 
-    if (clock.isAlarm1() || clock.isAlarm2())
-    {
-      startAlarm();
-    }  
+  if (clock.isAlarm1())
+  {
+    startAlarm();
   }
 
   if (alarmTriggered && alarmProgress < ALARM_TIME) {
     runAlarm(alarmProgress);
     alarmProgress++;
   } else if (alarmProgress >= ALARM_TIME) { // reset alarm counter
+    digitalWrite(ALARM_PIN, HIGH);
+  }
+
+  if (clock.isAlarm2())
+  {
     stopAlarm();
   }
 
@@ -107,8 +113,7 @@ void startAlarm() {
 }
 
 void stopAlarm() {
-//  digitalWrite(ALARM_PIN, LOW);
-  digitalWrite(ALARM_PIN, HIGH);
+  digitalWrite(ALARM_PIN, LOW);
   alarmTriggered = false;
   alarmProgress = 0;
   display.setBacklight(DEFAULT_BRIGHTNESS);
