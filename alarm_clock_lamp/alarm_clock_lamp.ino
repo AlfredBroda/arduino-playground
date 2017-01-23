@@ -39,6 +39,7 @@ void setup()
 
   // Initialize DS3231
   clock.begin();
+  //clock.setDateTime(2017, 01, 23, 21, 51, 0);
 
   // Disarm alarms and clear alarms for this example, because alarms is battery backed.
   // Under normal conditions, the settings should be reset after power and restart microcontroller.
