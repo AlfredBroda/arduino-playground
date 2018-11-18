@@ -1,34 +1,60 @@
 /*
-  TimedWatering
-  Turns a pump on for one minute per hour, repeatedly.
-
-  http://www.arduino.cc/en/Tutorial/Blink
+  Sensored Watering
+  Checks sensors for soil moisture, operates a stepper for a valve and turns a pump on/off 
 */
 
-// this constant won't change. It's the pin number of the sensor's output:
-const int outPin = 4;
-const int sensPin = 6;
-int state = 0;
+#include <CheapStepper.h>
+
+const int sensPin = 6; // pin number of the sensor
+const int outPin = 4; // pump switch pin
+
+const int homeSwitchPower = 2; // power for home/endstop switch
+const int homeSwitchPin = 3; // pin for checking if home position is reached
+
+const bool CWise = true;
+
+CheapStepper stepper (15,14,16,10);
 
 // the setup function runs once when you press reset or power the board
 void setup() {
-  // initialize digital pin LED_BUILTIN as an output.
   pinMode(outPin, OUTPUT);
   pinMode(sensPin, INPUT);
+
+  pinMode(homeSwitchPower, OUTPUT);
+  digitalWrite(homeSwitchPower, HIGH);
+
+  pinMode(homeSwitchPin, INPUT);
+
+  stepper.setRpm(10);
+  home();
 }
 
 // the loop function runs over and over again forever
 void loop() {
-  state = digitalRead(sensPin);
-  if (state == HIGH) {
-    digitalWrite(outPin, HIGH);   // turn the output on (HIGH is the voltage level)
-    delay(5000);
-    digitalWrite(outPin, LOW);    // turn the output off by making the voltage LOW
-  }
-  delay(1000);
-
-  //digitalWrite(outPin, HIGH);   // turn the output on (HIGH is the voltage level)
-  //delay(60000);                 // turn on for 1 minutes
-  //digitalWrite(outPin, LOW);    // turn the output off by making the voltage LOW
-  //delay(3540000);               // wait for 59 minutes
+  checkSensor(sensPin, 90);
+  delay(100);
 }
+
+void home() {
+  while(digitalRead(homeSwitchPin) == LOW) {
+    stepper.stepCCW();
+  }
+  stepper.stop();
+  while(digitalRead(homeSwitchPin) == HIGH) {
+    stepper.stepCW();
+  }  
+  stepper.stop();
+}
+
+void checkSensor(int pin, int angle) {
+  if (digitalRead(pin) == HIGH) {
+    stepper.moveDegrees(CWise, angle); // rotate the valve
+    digitalWrite(outPin, HIGH);   // turn the pump output on
+    while(digitalRead(pin) == HIGH) {  // keep checking the sensor
+      delay(1000);
+    }
+    digitalWrite(outPin, LOW);    // turn the pump output off
+    home(); // reset valve
+  }
+}
+
