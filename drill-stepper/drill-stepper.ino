@@ -1,7 +1,7 @@
 #include <TM1637Display.h>
 
 #define BAUD (9600)
-#define DEBUG true
+#define DEBUG false
 
 #define DEFDELAY 100
 #define MMSTEPSZ 320 // 320 steps is 1mm by default on TMC chips
@@ -89,6 +89,8 @@ void setup()
   dest_z = 0L;
   pos_z = 0L;    // should actually be undefined
   run_z = false; // wait for enable
+
+  sanityCheck();
 }
 
 void loop()
@@ -110,9 +112,16 @@ void loop()
     }
     updateCounter();
   }
-//  else if (!run_z) {
-//    updateCounter();
-//  }
+}
+
+void sanityCheck() {
+  while (digitalRead(ENDSTOPZ) == HIGH) {
+    serialPrint("Z axis endstop fault!");
+    display.setBrightness(0x0f);
+    display.clear();
+    display.setSegments(SEG_ERRZ);
+    delay(1000);
+  }
 }
 
 int readPosSet() {
