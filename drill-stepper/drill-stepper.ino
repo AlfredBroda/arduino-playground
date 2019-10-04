@@ -1,12 +1,12 @@
 #include <TM1637Display.h>
 
-#define BAUD (9600)
+#define BAUD (115200)
 #define DEBUG false
 
 #define DEFDELAY 100
 #define MMSTEPSZ 320 // 320 steps is 1mm by default on TMC chips
 #define MAXZ     300 // 30cm is the maximum z axis displacement
-#define MMRATIO   0.2932 // (float) MAXZ/1023
+#define MMRATIO   0.2932f // (float) MAXZ/1023
 #define STEPRATIO 94     // (int) MMSTEPSZ*MAXZ/1023 
 
 #define RESUME A2
@@ -15,7 +15,8 @@
 #define STEPZ  7
 #define DIRZ   4
 #define ENDSTOPZ 11
-#define POSZ   A6
+// #define POSZ   A6 // for UNO
+#define POSZ   A11 // for Leonardo, pin D12
 
 int step_delay_z;
 bool current_dir; // forward or reverse
@@ -64,12 +65,15 @@ const uint8_t SEG_START[] = {
 
 void setup()
 {
-  if (DEBUG) {
-    Serial.begin(BAUD);
-  }
-
   display.clear();
   display.setBrightness(0x01);
+
+  if (DEBUG) {
+    display.showNumberDec(BAUD/100, false);
+    Serial.begin(BAUD);
+    delay(100);
+    serialPrint("Drill press starting...");
+  }
 
   pinMode(RESUME, INPUT_PULLUP);  // Resume/Pause button
   // stepper pins
