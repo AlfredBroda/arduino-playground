@@ -17,6 +17,7 @@
 #define ENDSTOPZ 11
 // #define POSZ   A6 // for UNO
 #define POSZ   A11 // for Leonardo, pin D12
+#define SPEEDZ  A9 // for Leonardo, pin D9
 
 int step_delay_z;
 bool current_dir; // forward or reverse
@@ -84,7 +85,7 @@ void setup()
   // endstops
   pinMode(ENDSTOPZ, INPUT_PULLUP); // Endstop default closed
 
-  step_delay_z = DEFDELAY;
+  step_delay_z = DEFDELAY*2;
   current_dir = false; // set reverse
   disp_timer = 0;
 
@@ -100,7 +101,7 @@ void setup()
 void loop()
 {
   // get destination
-  readPosSet();
+  readPots();
   checkEnabled();
 
   if (run_z && error) {
@@ -128,10 +129,12 @@ void sanityCheck() {
   }
 }
 
-int readPosSet() {
+int readPots() {
   destz_Read = analogRead(POSZ);
   dest_z_mm = destz_Read * MMRATIO;
   dest_z = (long)destz_Read * STEPRATIO;
+
+  step_delay_z = analogRead(SPEEDZ)+ DEFDELAY;
 }
 
 void checkEnabled() {
