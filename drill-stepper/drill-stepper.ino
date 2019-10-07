@@ -79,7 +79,7 @@ void setup()
     display.showNumberDec(BAUD/100, false);
     Serial.begin(BAUD);
     delay(100);
-    serialPrintLn("Drill press starting...");
+    serialPrint("Drill press starting...");
   }
 
   pinMode(RESUME, INPUT_PULLUP);  // Resume/Pause button
@@ -92,7 +92,7 @@ void setup()
   // endstops
   pinMode(ENDSTOPZ, INPUT_PULLUP); // Endstop default closed
 
-  step_delay_z = analogRead(SPEEDZ)+STEPDELAY;
+  step_delay_z = STEPDELAY;
   current_dir = false; // set reverse
   disp_timer = 0;
 
@@ -109,7 +109,14 @@ void setup()
 void loop()
 {
   // get destination
-  readPots();
+  if (disp_timer == 0) {
+    readPots();
+  } else if (disp_timer > 1000) {
+    disp_timer = 0;
+  } else {
+    disp_timer += 1;
+  }
+
   checkEnabled();
 
   if (run_z && error) {
@@ -128,7 +135,7 @@ void loop()
 
 void sanityCheck() {
   while (digitalRead(ENDSTOPZ) == HIGH) {
-    serialPrintLn("Z axis endstop fault!");
+    serialPrint("Z axis endstop fault!");
     display.setBrightness(0x0f);
     display.clear();
     display.setSegments(SEG_ERRZ);
@@ -150,10 +157,11 @@ int readPots() {
   step_delay_read = analogRead(SPEEDZ);
   while (step_delay_read < (step_delay_old - DEADZONE) || step_delay_read > (step_delay_old + DEADZONE)) {
     step_delay_old = step_delay_read;
-    step_delay_z = (int)(step_delay_read/10)+STEPDELAY;
+    step_delay_z = (int)(step_delay_read/10);
     serialPrint("Step delay: ");
     serialPrint(step_delay_z);
   }
+  serialPrint("step_delay_read: ", step_delay_read);
 }
 
 void checkEnabled() {
@@ -169,8 +177,7 @@ void checkEnabled() {
 }
 
 void doStay() {
-  serialPrint("At set position:");
-  serialPrint(dest_z);
+  serialPrint("At set position: ", dest_z);
   for (int x = 0; x < 4; x++) {
     if (x % 2 == 0) {
       display.setBrightness(0x0f);
@@ -178,13 +185,14 @@ void doStay() {
       display.setBrightness(0x01);
     }
     updateCounter();
-    delay(100);
+    delay(500);
   }
+  readPots();
 }
 
+// this is an expensive funtion, expect a huge delay!
 void updateCounter() {
   display.showNumberDec(dest_z_mm, false);
-  disp_timer += 1;
 }
 
 void doStepZ(const bool dir) {
@@ -203,7 +211,7 @@ void doStepZ(const bool dir) {
 }
 
 void homeZAxis() {
-  serialPrintLn("Homing Z axis...");
+  serialPrint("Homing Z axis...");
   display.clear();
   display.setSegments(SEG_HOME);
   current_dir = false;
@@ -219,7 +227,7 @@ void homeZAxis() {
     doStepZ(current_dir);
   }
 
-  serialPrintLn("Homing Z axis done.");
+  serialPrint("Homing Z axis done.");
   for (int x = 0; x < 6; x++) {
     if (x % 2 == 0) {
       display.setBrightness(0x0f);
@@ -248,7 +256,7 @@ void reverseDir() {
 bool checkEndstopZ() {
   if (digitalRead(ENDSTOPZ) == HIGH) {
     // stop at once if endstop reached, back off until cleared
-    serialPrintLn("Z axis endstop reached!");
+    serialPrint("Z axis endstop reached!");
     display.setBrightness(0x0f);
     display.clear();
     display.setSegments(SEG_ERRZ);
@@ -258,26 +266,27 @@ bool checkEndstopZ() {
     for (int x = 0; x < MMSTEPSZ; x++) {
       doStepZ(current_dir);
     }
-    serialPrintLn("Z axis endstop cleared.");
+    serialPrint("Z axis endstop cleared.");
 
     // disable steppers, wait for reset
     digitalWrite(ENABLE, HIGH);
     error = true;
     run_z = false;
-    serialPrintLn("Stopped Z");
+    serialPrint("Stopped Z");
 
     return true;
   }
   return false;
 }
 
-void serialPrint(const String &text) {
+void serialPrint(const String &text, const int val) {
   if (DEBUG) {
     Serial.print(text);
+    Serial.println(val);
   }
 }
 
-void serialPrintLn(const String &text) {
+void serialPrint(const String &text) {
   if (DEBUG) {
     Serial.println(text);
   }
