@@ -3,14 +3,13 @@
 #define BAUD (115200)
 #define DEBUG true
 
-#define STEPPULSE 100 // stepper driver step pulse length
-#define STEPDELAY 1000 // delay until the next step
-// #define MMSTEPSZ  320 // 320 steps is 1mm by default on TMC chips
-#define MMSTEPSZ  100 // 200 steps is one full rotation of the stepper
+#define STEPPULSE 10 // stepper driver step pulse length
+#define STEPDELAY 10 // delay until the next step
+#define MMSTEPSZ  200*16 // 200 steps is one full rotation of the stepper
 #define MAXZ      300 // 30cm is the maximum z axis displacement
 #define MMRATIO   0.2932f // (float) MAXZ/1023
-#define STEPRATIO 94      // (int) MMSTEPSZ*MAXZ/1023 
-#define DEADZONE  2
+#define STEPRATIO 938     // (int) MMSTEPSZ*MAXZ/1023 
+#define DEADZONE  5
 
 #define RESUME A2
 // Z axis stepper driver pins
@@ -23,6 +22,8 @@
 #define SPEEDZ  A9 // for Leonardo, pin D9
 
 int step_delay_z;
+int step_delay_old;
+int step_delay_read;
 bool current_dir; // forward or reverse
 bool error;
 
@@ -78,7 +79,7 @@ void setup()
     display.showNumberDec(BAUD/100, false);
     Serial.begin(BAUD);
     delay(100);
-    serialPrint("Drill press starting...");
+    serialPrintLn("Drill press starting...");
   }
 
   pinMode(RESUME, INPUT_PULLUP);  // Resume/Pause button
@@ -87,10 +88,11 @@ void setup()
   pinMode(STEPZ, OUTPUT);  // Step
   pinMode(DIRZ, OUTPUT);   // Dir
   pinMode(POSZ, INPUT);    // Position knob
+  pinMode(SPEEDZ, INPUT);  // Speed knob
   // endstops
   pinMode(ENDSTOPZ, INPUT_PULLUP); // Endstop default closed
 
-  step_delay_z = STEPDELAY*2;
+  step_delay_z = analogRead(SPEEDZ)+STEPDELAY;
   current_dir = false; // set reverse
   disp_timer = 0;
 
@@ -126,7 +128,7 @@ void loop()
 
 void sanityCheck() {
   while (digitalRead(ENDSTOPZ) == HIGH) {
-    serialPrint("Z axis endstop fault!");
+    serialPrintLn("Z axis endstop fault!");
     display.setBrightness(0x0f);
     display.clear();
     display.setSegments(SEG_ERRZ);
@@ -144,7 +146,14 @@ int readPots() {
     
     updateCounter();
   }
-  step_delay_z = analogRead(SPEEDZ)+ STEPDELAY;
+
+  step_delay_read = analogRead(SPEEDZ);
+  while (step_delay_read < (step_delay_old - DEADZONE) || step_delay_read > (step_delay_old + DEADZONE)) {
+    step_delay_old = step_delay_read;
+    step_delay_z = (int)(step_delay_read/10)+STEPDELAY;
+    serialPrint("Step delay: ");
+    serialPrint(step_delay_z);
+  }
 }
 
 void checkEnabled() {
@@ -194,7 +203,7 @@ void doStepZ(const bool dir) {
 }
 
 void homeZAxis() {
-  serialPrint("Homing Z axis...");
+  serialPrintLn("Homing Z axis...");
   display.clear();
   display.setSegments(SEG_HOME);
   current_dir = false;
@@ -210,7 +219,7 @@ void homeZAxis() {
     doStepZ(current_dir);
   }
 
-  serialPrint("Homing Z axis done.");
+  serialPrintLn("Homing Z axis done.");
   for (int x = 0; x < 6; x++) {
     if (x % 2 == 0) {
       display.setBrightness(0x0f);
@@ -239,7 +248,7 @@ void reverseDir() {
 bool checkEndstopZ() {
   if (digitalRead(ENDSTOPZ) == HIGH) {
     // stop at once if endstop reached, back off until cleared
-    serialPrint("Z axis endstop reached!");
+    serialPrintLn("Z axis endstop reached!");
     display.setBrightness(0x0f);
     display.clear();
     display.setSegments(SEG_ERRZ);
@@ -249,13 +258,13 @@ bool checkEndstopZ() {
     for (int x = 0; x < MMSTEPSZ; x++) {
       doStepZ(current_dir);
     }
-    serialPrint("Z axis endstop cleared.");
+    serialPrintLn("Z axis endstop cleared.");
 
     // disable steppers, wait for reset
     digitalWrite(ENABLE, HIGH);
     error = true;
     run_z = false;
-    serialPrint("Stopped Z");
+    serialPrintLn("Stopped Z");
 
     return true;
   }
@@ -263,6 +272,12 @@ bool checkEndstopZ() {
 }
 
 void serialPrint(const String &text) {
+  if (DEBUG) {
+    Serial.print(text);
+  }
+}
+
+void serialPrintLn(const String &text) {
   if (DEBUG) {
     Serial.println(text);
   }
