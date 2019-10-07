@@ -1,13 +1,16 @@
 #include <TM1637Display.h>
 
 #define BAUD (115200)
-#define DEBUG false
+#define DEBUG true
 
-#define DEFDELAY 100
-#define MMSTEPSZ 320 // 320 steps is 1mm by default on TMC chips
-#define MAXZ     300 // 30cm is the maximum z axis displacement
+#define STEPPULSE 100 // stepper driver step pulse length
+#define STEPDELAY 1000 // delay until the next step
+// #define MMSTEPSZ  320 // 320 steps is 1mm by default on TMC chips
+#define MMSTEPSZ  100 // 200 steps is one full rotation of the stepper
+#define MAXZ      300 // 30cm is the maximum z axis displacement
 #define MMRATIO   0.2932f // (float) MAXZ/1023
-#define STEPRATIO 94     // (int) MMSTEPSZ*MAXZ/1023 
+#define STEPRATIO 94      // (int) MMSTEPSZ*MAXZ/1023 
+#define DEADZONE  2
 
 #define RESUME A2
 // Z axis stepper driver pins
@@ -25,9 +28,11 @@ bool error;
 
 bool run_z;
 int destz_Read;
+int destz_Old;
 long pos_z;
 long dest_z;
 float dest_z_mm;
+float old_dest_z_mm;
 
 int disp_timer;
 
@@ -85,13 +90,14 @@ void setup()
   // endstops
   pinMode(ENDSTOPZ, INPUT_PULLUP); // Endstop default closed
 
-  step_delay_z = DEFDELAY*2;
+  step_delay_z = STEPDELAY*2;
   current_dir = false; // set reverse
   disp_timer = 0;
 
   error = true; // we don't know the position of the machine
-  dest_z_mm = 0;
-  dest_z = 0L;
+  old_dest_z_mm = 0.0f;
+  dest_z_mm = 120.0f;
+  dest_z = dest_z_mm * STEPRATIO;
   pos_z = 0L;    // should actually be undefined
   run_z = false; // wait for enable
 
@@ -115,7 +121,6 @@ void loop()
     } else if (dest_z < pos_z) {
       doStepZ(false);
     }
-    updateCounter();
   }
 }
 
@@ -131,10 +136,15 @@ void sanityCheck() {
 
 int readPots() {
   destz_Read = analogRead(POSZ);
-  dest_z_mm = destz_Read * MMRATIO;
-  dest_z = (long)destz_Read * STEPRATIO;
-
-  step_delay_z = analogRead(SPEEDZ)+ DEFDELAY;
+  // Use a deadzone for stable target value
+  while (destz_Read < (destz_Old - DEADZONE) || destz_Read > (destz_Old + DEADZONE)) {
+    destz_Old = destz_Read;
+    dest_z_mm = destz_Read * MMRATIO;
+    dest_z = (long)destz_Read * STEPRATIO;
+    
+    updateCounter();
+  }
+  step_delay_z = analogRead(SPEEDZ)+ STEPDELAY;
 }
 
 void checkEnabled() {
@@ -150,46 +160,29 @@ void checkEnabled() {
 }
 
 void doStay() {
-  if (disp_timer == 0) {
-    serialPrint("At set position:");
-    serialPrint(dest_z);
-    for (int x = 0; x < 10; x++) {
-      if (x % 2 == 0) {
-        display.setBrightness(0x0f);
-      } else {
-        display.setBrightness(0x01);
-      }
-      display.showNumberDec(dest_z_mm, false);
-      delay(100);
+  serialPrint("At set position:");
+  serialPrint(dest_z);
+  for (int x = 0; x < 4; x++) {
+    if (x % 2 == 0) {
+      display.setBrightness(0x0f);
+    } else {
+      display.setBrightness(0x01);
     }
+    updateCounter();
+    delay(100);
   }
 }
 
 void updateCounter() {
-  if (disp_timer % MMSTEPSZ == 0) {
-    if (disp_timer < 10 * MMSTEPSZ) {
-      display.setBrightness(0x0f);
-      display.showNumberDec(round(pos_z / MMSTEPSZ), false);
-    } else {
-      display.setBrightness(0x02);
-      display.showNumberDec(dest_z_mm, false);
-    }
-    serialPrint("Position/destination:");
-    serialPrint(destz_Read);
-    serialPrint(pos_z);
-    serialPrint(dest_z);
-  }
+  display.showNumberDec(dest_z_mm, false);
   disp_timer += 1;
-  if (disp_timer > 15 * MMSTEPSZ) {
-    disp_timer = 0;
-  }
 }
 
 void doStepZ(const bool dir) {
   current_dir = dir;
   digitalWrite(DIRZ, dir); // Set Dir
   digitalWrite(STEPZ, HIGH); // Output high
-  delayMicroseconds(100); // Wait
+  delayMicroseconds(STEPPULSE); // Step
   digitalWrite(STEPZ, LOW); // Output low
   delayMicroseconds(step_delay_z); // Wait
 
@@ -232,6 +225,7 @@ void homeZAxis() {
 
   pos_z = 0;
   error = false;
+  updateCounter();
 }
 
 void reverseDir() {
@@ -270,16 +264,12 @@ bool checkEndstopZ() {
 
 void serialPrint(const String &text) {
   if (DEBUG) {
-    Serial.print(millis());
-    Serial.print(": ");
     Serial.println(text);
   }
 }
 
 void serialPrint(const int text) {
   if (DEBUG) {
-    Serial.print(millis());
-    Serial.print(": ");
     Serial.println(text);
   }
 }
